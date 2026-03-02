@@ -3,7 +3,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
-import 'main_screen.dart';
+import '../features/auth/auth_wrapper.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -72,7 +72,7 @@ class _SplashScreenState extends State<SplashScreen>
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const MainScreen(),
+          pageBuilder: (_, __, ___) => const AuthWrapper(),
           transitionDuration: const Duration(milliseconds: 600),
           transitionsBuilder: (_, anim, __, child) => FadeTransition(
             opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),

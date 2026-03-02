@@ -1,7 +1,9 @@
 // lib/screens/about_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../core/theme/app_theme.dart';
+import '../services/auth_service.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -94,29 +96,38 @@ class _AboutScreenState extends State<AboutScreen>
                 // ── Footer ─────────────────────────────────────────────────────
                 _stagger(
                   7,
-                  Center(
-                    child: Column(
-                      children: [
-                        ShaderMask(
-                          shaderCallback: (b) => AppTheme.brandGradient.createShader(b),
-                          child: const Text(
-                            'DesignSphere',
-                            style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w800,
-                              color: Colors.white, letterSpacing: -0.3,
+                  Column(
+                    children: [
+                      // ── Signed-in user card ─────────────────────────────────
+                      _AccountCard(colors: colors, isDark: isDark),
+                      const SizedBox(height: 20),
+
+                      // ── App credit ──────────────────────────────────────────
+                      Center(
+                        child: Column(
+                          children: [
+                            ShaderMask(
+                              shaderCallback: (b) => AppTheme.brandGradient.createShader(b),
+                              child: const Text(
+                                'DesignSphere',
+                                style: TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.w800,
+                                  color: Colors.white, letterSpacing: -0.3,
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Made with ❤️  by the DesignSphere team',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: colors.textHint),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Made with ❤️  by the DesignSphere team',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: colors.textHint),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -405,6 +416,151 @@ class _WhyUsGrid extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+// ── Account card with sign out button ────────────────────────────────────────
+class _AccountCard extends StatelessWidget {
+  final AppColors colors;
+  final bool isDark;
+  const _AccountCard({required this.colors, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colors.cardBg,
+        borderRadius: BorderRadius.circular(AppTheme.radiusL),
+        border: Border.all(color: colors.divider, width: 0.5),
+        boxShadow: colors.cardShadow,
+      ),
+      child: Row(
+        children: [
+          // Avatar with first letter of name
+          Container(
+            width: 46, height: 46,
+            decoration: BoxDecoration(
+              gradient: AppTheme.brandGradient,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primary.withOpacity(0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                (user?.displayName?.isNotEmpty == true
+                    ? user!.displayName![0]
+                    : user?.email?[0] ?? '?').toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 14),
+
+          // Name + email
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user?.displayName ?? 'User',
+                  style: Theme.of(context).textTheme.titleMedium,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  user?.email ?? '',
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: colors.textHint),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+          // Sign out button
+          GestureDetector(
+            onTap: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: colors.cardBg,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusL),
+                  ),
+                  title: Text('Sign Out',
+                      style: Theme.of(context).textTheme.titleLarge),
+                  content: Text(
+                    'Are you sure you want to sign out?',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text('Cancel',
+                          style: TextStyle(color: colors.textSub)),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Sign Out',
+                          style: TextStyle(
+                            color: Color(0xFFEF4444),
+                            fontWeight: FontWeight.w700,
+                          )),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await AuthService().signOut();
+                // AuthWrapper automatically routes back to AuthScreen
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withOpacity(isDark ? 0.15 : 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFFEF4444).withOpacity(isDark ? 0.3 : 0.2),
+                  width: 0.5,
+                ),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.logout_rounded, size: 15, color: Color(0xFFEF4444)),
+                  SizedBox(width: 5),
+                  Text(
+                    'Sign Out',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFEF4444),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

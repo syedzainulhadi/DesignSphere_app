@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "765459785164",
+    "project_id": "designsphere-66a0c",
+    "storage_bucket": "designsphere-66a0c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:765459785164:android:68ddbf32b5be2bd5bd2969",
+        "android_client_info": {
+          "package_name": "com.example.design_sphere"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1e3eSwqQiYr0ofY71H-s5jn2X2M7qHNE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

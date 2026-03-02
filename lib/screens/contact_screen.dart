@@ -1,21 +1,26 @@
 // lib/screens/contact_screen.dart
+//
+// This screen has TWO submission paths that run in parallel:
+//   1. EmailJS  → admin gets an email notification instantly (existing, unchanged)
+//   2. Firestore → lead is stored permanently in the database (NEW)
+//
+// Both run on every valid form submission.
+// If Firestore fails, the user still sees success (email already went through).
+// If EmailJS fails, we show an error — but still save to Firestore silently.
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../core/theme/app_theme.dart';
+import '../services/firestore_service.dart';
 import '../widgets/gradient_button.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  EmailJS Configuration
+//  EmailJS Configuration — unchanged from before
 //  ➜ Sign up FREE at https://www.emailjs.com
 //  ➜ Create a service (Gmail / Outlook)  → copy Service ID
 //  ➜ Create an email template            → copy Template ID
 //  ➜ Account → API Keys                  → copy Public Key
-//
-//  Template variables to use:
-//    {{from_name}}  {{from_email}}  {{phone}}
-//    {{service_req}} {{message}}   {{to_email}}
 // ─────────────────────────────────────────────────────────────────────────────
 const String _emailJsServiceId  = 'service_02x35wb';
 const String _emailJsTemplateId = 'template_vcy0wn9';
@@ -40,6 +45,9 @@ class _ContactScreenState extends State<ContactScreen>
   bool _isLoading = false;
 
   late AnimationController _entranceCtrl;
+
+  // FirestoreService for saving leads
+  final _firestoreService = FirestoreService();
 
   static const _services = [
     'Mobile App Development',
@@ -71,13 +79,14 @@ class _ContactScreenState extends State<ContactScreen>
     super.dispose();
   }
 
+  // ── EmailJS — exactly as before, nothing changed ──────────────────────────
   Future<bool> _sendEmail() async {
   const url = 'https://api.emailjs.com/api/v1.0/email/send';
   try {
     final response = await http.post(
       Uri.parse(url),
       headers: {
-        'origin': 'http://localhost', // ✅ VERY IMPORTANT
+        'origin': 'http://localhost', // ⭐ IMPORTANT
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
@@ -97,9 +106,6 @@ class _ContactScreenState extends State<ContactScreen>
       }),
     );
 
-    debugPrint('Status Code: ${response.statusCode}');
-    debugPrint('Response Body: ${response.body}');
-
     return response.statusCode == 200;
   } catch (e) {
     debugPrint('EmailJS error: $e');
@@ -107,29 +113,50 @@ class _ContactScreenState extends State<ContactScreen>
   }
 }
 
+  // ── Main submit handler ───────────────────────────────────────────────────
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
-    debugPrint('=== Contact Form ===');
-    debugPrint('Name:    ${_nameCtrl.text}');
-    debugPrint('Email:   ${_emailCtrl.text}');
-    debugPrint('Phone:   ${_phoneCtrl.text}');
-    debugPrint('Service: $_selectedService');
-    debugPrint('Message: ${_messageCtrl.text}');
+    // Capture all values before any async gap
+    final name    = _nameCtrl.text.trim();
+    final email   = _emailCtrl.text.trim();
+    final phone   = _phoneCtrl.text.trim();
+    final service = _selectedService ?? 'Not specified';
+    final message = _messageCtrl.text.trim();
 
-    final success = await _sendEmail();
+    // Run both in parallel for speed — we don't need to wait for one
+    // before starting the other.
+    final results = await Future.wait([
+      _sendEmail(),
+      _firestoreService.saveLead(
+        name:             name,
+        email:            email,
+        phone:            phone,
+        serviceRequested: service,
+        message:          message,
+      ),
+    ]);
+
+    final emailSent      = results[0];
+    final savedToFirestore = results[1];
+
     setState(() => _isLoading = false);
     if (!mounted) return;
 
+    // Log outcome for debugging
+    debugPrint('EmailJS: $emailSent | Firestore: $savedToFirestore');
+
+    // User feedback is based on EmailJS result (primary channel)
     _showSnack(
-      success
+      emailSent
           ? 'Request sent! We\'ll be in touch within 24 hours. ✨'
           : 'Failed to send. Please check your EmailJS config.',
-      success,
+      emailSent,
     );
-    if (success) _resetForm();
+
+    if (emailSent) _resetForm();
   }
 
   void _resetForm() {
@@ -238,7 +265,6 @@ class _ContactScreenState extends State<ContactScreen>
 
               const SizedBox(height: 28),
 
-              // ── Form ────────────────────────────────────────────────────────
               Form(
                 key: _formKey,
                 child: Column(
@@ -358,15 +384,15 @@ class _ContactScreenState extends State<ContactScreen>
   }
 
   Widget _fieldLabel(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 0),
-        child: Text(
-          text,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: context.appColors.textPrimary,
-            letterSpacing: 0.1,
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(bottom: 0),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: context.appColors.textPrimary,
+        letterSpacing: 0.1,
+      ),
+    ),
+  );
 }
